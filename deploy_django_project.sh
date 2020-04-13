@@ -35,7 +35,7 @@ fi
 
 GROUPNAME=webapps
 # app folder name under /webapps/<appname>_project
-APPFOLDER=$1_project
+APPFOLDER=$1
 APPFOLDERPATH=/$GROUPNAME/$APPFOLDER
 
 # Determine requested Python version & subversion
@@ -49,10 +49,13 @@ fi
 echo "Python version: $PYTHON_VERSION_STR"
 
 # ###################################################################
-# Create the app folder
+# Create the app folder 
+# and copy source code
 # ###################################################################
-echo "Creating app folder '$APPFOLDERPATH'..."
-mkdir -p /$GROUPNAME/$APPFOLDER || error_exit "Could not create app folder"
+echo "Creating app folder '$GROUPNAME'..."
+mkdir -p /$GROUPNAME || error_exit "Could not create app folder"
+echo "copy source code ..."
+cp -r ./$APPNAME /$GROUPNAME/
 
 # test the group 'webapps' exists, and if it doesn't create it
 getent group $GROUPNAME
@@ -77,8 +80,10 @@ chmod g+x $APPFOLDERPATH || error_exit "Error setting group execute flag"
 
 # install python virtualenv in the APPFOLDER
 echo "Creating environment setup for django app..."
+cd $APPFOLDERPATH
 if [ "$PYTHON_VERSION" == "3" ]; then
 su -l $APPNAME << 'EOF'
+cd ~
 pwd
 echo "Setting up python virtualenv..."
 virtualenv -p python3 . || error_exit "Error installing Python 3 virtual environment to app folder"
@@ -106,23 +111,22 @@ fi
 # ###################################################################
 su -l $APPNAME << 'EOF'
 source ./bin/activate
+pwd
 # upgrade pip
 pip install --upgrade pip || error_exist "Error upgrading pip to the latest version"
 # install prerequisite python packages for a django app using pip
 echo "Installing base python packages for the app..."
-# Standard django packages which will be installed. If any of these fail, script will abort
-DJANGO_PKGS=('django' 'psycopg2' 'gunicorn' 'setproctitle')
-for dpkg in "${DJANGO_PKGS[@]}"
-    do
-        echo "Installing $dpkg..."
-        pip install $dpkg || error_exit "Error installing $dpkg"
-    done
+pip install -r requirements_dev.txt
 # create the default folders where we store django app's resources
 echo "Creating static file folders..."
-mkdir logs nginx run static media || error_exit "Error creating static folders"
-# Create the UNIX socket file for WSGI interface
-echo "Creating WSGI interface UNIX socket file..."
-python -c "import socket as s; sock = s.socket(s.AF_UNIX); sock.bind('./run/gunicorn.sock')"
+mkdir logs nginx run static media staticfiles || error_exit "Error creating static folders"
+
+echo "initing database ..."
+./manage.py collectstatic
+./manage.py makemigrations
+./manage.py migrate
+./manage.py createcachetable
+
 EOF
 
 # ###################################################################
@@ -133,6 +137,7 @@ DJANGO_SECRET_KEY=`openssl rand -base64 48`
 if [ $? -ne 0 ]; then
     error_exit "Error creating secret key."
 fi
+
 echo $DJANGO_SECRET_KEY > $APPFOLDERPATH/.django_secret_key
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_secret_key
 
@@ -151,20 +156,29 @@ chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_db_password
 # Create the script that will init the virtual environment. This
 # script will be called from the gunicorn start script created next.
 # ###################################################################
-echo "Creating virtual environment setup script..."
-cat > /tmp/prepare_env.sh << EOF
-DJANGODIR=$APPFOLDERPATH/$APPNAME          # Django project directory
 
-export DJANGO_SETTINGS_MODULE=$APPNAME.settings.production # settings file for the app
-export PYTHONPATH=\$DJANGODIR:\$PYTHONPATH
-export SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
-export DB_PASSWORD=`cat $APPFOLDERPATH/.django_db_password`
-
-cd $APPFOLDERPATH
-source ./bin/activate
+cat > /tmp/.env << EOF
+ENVIRONMENT='production'
+DJANGO_SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
+DJANGO_DEBUG='no'
+DJANGO_TEMPLATE_DEBUG='no'
 EOF
-mv /tmp/prepare_env.sh $APPFOLDERPATH
-chown $APPNAME:$GROUPNAME $APPFOLDERPATH/prepare_env.sh
+mv /tmp/.env $APPFOLDERPATH
+chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
+
+# ###################################################################
+#  makemigrations & migrate  & createcachetable
+#  collectstatic
+# ###################################################################
+su -l $APPNAME << 'EOF'
+source ./bin/activate
+echo "initing database ..."
+./manage.py collectstatic
+./manage.py makemigrations
+./manage.py migrate
+./manage.py createcachetable
+
+EOF
 
 # ###################################################################
 # Create gunicorn start script which will be spawned and managed
@@ -186,19 +200,13 @@ cat > /tmp/gunicorn_start.sh << EOF
 #
 
 cd $APPFOLDERPATH
-source ./prepare_env.sh
 
-SOCKFILE=$APPFOLDERPATH/run/gunicorn.sock  # we will communicte using this unix socket
 USER=$APPNAME                                        # the user to run as
 GROUP=$GROUPNAME                                     # the group to run as
-NUM_WORKERS=3                                     # how many worker processes should Gunicorn spawn
-DJANGO_WSGI_MODULE=$APPNAME.wsgi                     # WSGI module name
+NUM_WORKERS=2                                    # how many worker processes should Gunicorn spawn
+DJANGO_WSGI_MODULE=config.wsgi                     # WSGI module name
 
 echo "Starting $APPNAME as \`whoami\`"
-
-# Create the run directory if it doesn't exist
-RUNDIR=\$(dirname \$SOCKFILE)
-test -d \$RUNDIR || mkdir -p \$RUNDIR
 
 # Start your Django Unicorn
 # Programs meant to be run under supervisor should not daemonize themselves (do not use --daemon)
@@ -206,7 +214,7 @@ exec ./bin/gunicorn \${DJANGO_WSGI_MODULE}:application \
   --name $APPNAME \
   --workers \$NUM_WORKERS \
   --user=\$USER --group=\$GROUP \
-  --bind=unix:\$SOCKFILE \
+  --bind=127.0.0.1:8000 \
   --log-level=debug \
   --log-file=-
 EOF
@@ -235,7 +243,7 @@ APPSERVERNAME=$APPNAME
 APPSERVERNAME+=_gunicorn
 cat > $APPFOLDERPATH/nginx/$APPNAME.conf << EOF
 upstream $APPSERVERNAME {
-    server unix:$APPFOLDERPATH/run/gunicorn.sock fail_timeout=0;
+    server 127.0.0.1:8000 fail_timeout=0;
 }
 server {
     listen 80;
@@ -252,7 +260,7 @@ server {
         alias $APPFOLDERPATH/media;
     }
     location /static {
-        alias $APPFOLDERPATH/static;
+        alias $APPFOLDERPATH/staticfiles;
     }
     location /static/admin {
        alias $APPFOLDERPATH/lib/python$PYTHON_VERSION_STR/site-packages/django/contrib/admin/static/admin/;
@@ -338,62 +346,6 @@ if [ ! -f /etc/init.d/supervisord ]; then
     SUPERVISORD_ACTION='start'
 fi
 
-# Now create a quasi django project that can be run using a GUnicorn script
-echo "Installing quasi django project..."
-su -l $APPNAME << EOF
-source ./bin/activate
-django-admin.py startproject $APPNAME
-
-# Change Django's default settings.py to use app/settings/{base.py|dev.py|production.py}
-mv $APPNAME/$APPNAME/settings.py $APPNAME/$APPNAME/base.py
-mkdir $APPNAME/$APPNAME/settings
-mv $APPNAME/$APPNAME/base.py $APPNAME/$APPNAME/settings
-
-EOF
-
-echo "Changing quasi django project settings to production.py..."
-cat > $APPFOLDERPATH/$APPNAME/$APPNAME/settings/production.py << EOF
-from .base import *
-
-def get_env_variable(var):
-    '''Return the environment variable value or raise error'''
-    try:
-        return os.environ[var]
-    except KeyError:
-        error_msg = "Set the {} environment variable".format(var)
-        raise ImproperlyConfigured(error_msg)
-
-DEBUG = False
-
-# Note that this is a wildcard specification. So it matches
-# smallpearl.com as well as www.smallpearl.com
-ALLOWED_HOSTS = ['.$DOMAINNAME']
-
-# CSRF middleware token & session cookie will only be transmitted over HTTPS
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
-
-# Get secret hash key from environment variable (set by ./prepre_env.sh)
-SECRET_KEY = get_env_variable('SECRET_KEY')
-
-# Get production DB password is from environment variable
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': '$APPNAME',
-        'USER': '$APPNAME',
-        'PASSWORD': get_env_variable('DB_PASSWORD'),
-        'HOST': 'localhost',
-        'PORT': '',
-    }
-}
-
-# This setting corresponds to NGINX server configuration, which adds this
-# to the request headers that is proxied to gunicorn app server.
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-
-EOF
-chown $APPNAME:$GROUPNAME $APPFOLDERPATH/$APPNAME/$APPNAME/settings/production.py
 
 # ###################################################################
 # Reload/start supervisord and nginx
