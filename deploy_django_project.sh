@@ -80,18 +80,17 @@ chmod g+x $APPFOLDERPATH || error_exit "Error setting group execute flag"
 
 # install python virtualenv in the APPFOLDER
 echo "Creating environment setup for django app..."
-cd $APPFOLDERPATH
+
+#cd $APPFOLDERPATH
 if [ "$PYTHON_VERSION" == "3" ]; then
 su -l $APPNAME << 'EOF'
 cd ~
-pwd
 echo "Setting up python virtualenv..."
 virtualenv -p python3 . || error_exit "Error installing Python 3 virtual environment to app folder"
 
 EOF
 else
 su -l $APPNAME << 'EOF'
-pwd
 echo "Setting up python virtualenv..."
 virtualenv . || error_exit "Error installing Python 2 virtual environment to app folder"
 
@@ -111,7 +110,6 @@ fi
 # ###################################################################
 su -l $APPNAME << 'EOF'
 source ./bin/activate
-pwd
 # upgrade pip
 pip install --upgrade pip || error_exist "Error upgrading pip to the latest version"
 # install prerequisite python packages for a django app using pip
@@ -120,12 +118,6 @@ pip install -r requirements_dev.txt
 # create the default folders where we store django app's resources
 echo "Creating static file folders..."
 mkdir logs nginx run static media staticfiles || error_exit "Error creating static folders"
-
-echo "initing database ..."
-./manage.py collectstatic
-./manage.py makemigrations
-./manage.py migrate
-./manage.py createcachetable
 
 EOF
 
@@ -141,16 +133,6 @@ fi
 echo $DJANGO_SECRET_KEY > $APPFOLDERPATH/.django_secret_key
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_secret_key
 
-# ###################################################################
-# Generate DB password
-# ###################################################################
-echo "Creating secure password for database role..."
-DBPASSWORD=`openssl rand -base64 32`
-if [ $? -ne 0 ]; then
-    error_exit "Error creating secure password for database role."
-fi
-echo $DBPASSWORD > $APPFOLDERPATH/.django_db_password
-chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_db_password
 
 # ###################################################################
 # Create the script that will init the virtual environment. This
@@ -163,8 +145,20 @@ DJANGO_SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
 DJANGO_DEBUG='no'
 DJANGO_TEMPLATE_DEBUG='no'
 EOF
-mv /tmp/.env $APPFOLDERPATH
+mv /tmp/.env $APPFOLDERPATH/
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
+
+
+# ###################################################################
+# Generate DB password
+# ###################################################################
+echo "Creating secure password for database role..."
+DBPASSWORD=`openssl rand -base64 32`
+if [ $? -ne 0 ]; then
+    error_exit "Error creating secure password for database role."
+fi
+echo $DBPASSWORD > $APPFOLDERPATH/.django_db_password
+chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_db_password
 
 # ###################################################################
 #  makemigrations & migrate  & createcachetable
@@ -173,6 +167,7 @@ chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
 su -l $APPNAME << 'EOF'
 source ./bin/activate
 echo "initing database ..."
+ls ./.env
 ./manage.py collectstatic
 ./manage.py makemigrations
 ./manage.py migrate
@@ -320,6 +315,8 @@ ln -sf $APPFOLDERPATH/nginx/$APPNAME.conf /etc/nginx/sites-enabled/$APPNAME
 # ###################################################################
 
 # Copy supervisord.conf if it does not exist
+pwd
+
 if [ ! -f /etc/supervisord.conf ]; then
 	cp ./supervisord.conf /etc || error_exit "Error copying supervisord.conf"
 fi

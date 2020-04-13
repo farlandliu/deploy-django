@@ -38,6 +38,9 @@ LINUX_PREREQ=('git' 'build-essential' 'python-dev' 'python-pip' 'nginx' 'postgre
 fi
 PYTHON_PREREQ=('virtualenv' 'supervisor')
 
+apt update
+sudo -H pip3 install --upgrade pip
+
 # Test prerequisites
 echo "Checking if required packages are installed..."
 declare -a MISSING
