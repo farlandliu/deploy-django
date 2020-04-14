@@ -135,21 +135,6 @@ chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_secret_key
 
 
 # ###################################################################
-# Create the script that will init the virtual environment. This
-# script will be called from the gunicorn start script created next.
-# ###################################################################
-
-cat > /tmp/.env << EOF
-ENVIRONMENT='production'
-DJANGO_SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
-DJANGO_DEBUG='no'
-DJANGO_TEMPLATE_DEBUG='no'
-EOF
-mv /tmp/.env $APPFOLDERPATH/
-chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
-
-
-# ###################################################################
 # Generate DB password
 # ###################################################################
 echo "Creating secure password for database role..."
@@ -160,14 +145,43 @@ fi
 echo $DBPASSWORD > $APPFOLDERPATH/.django_db_password
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_db_password
 
+
+# ###################################################################
+# Create the script that will init the virtual environment. This
+# script will be called from the gunicorn start script created next.
+# ###################################################################
+
+cat > /tmp/.env << EOF
+ENVIRONMENT='production'
+DJANGO_SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
+DJANGO_DEBUG='no'
+DJANGO_TEMPLATE_DEBUG='no'
+DATABASE_URL=postgres://$APPNAME:$DBPASSWORD@localhost:5432/$APPNAME
+EOF
+mv /tmp/.env $APPFOLDERPATH/
+chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
+
+# ###################################################################
+# Create the PostgreSQL database and associated role for the app
+# Database and role name would be the same as the <appname> argument
+# ###################################################################
+echo "Creating PostgreSQL role '$APPNAME'..."
+su postgres -c "createuser -S -D -R -w $APPNAME"
+echo "Changing password of database role..."
+su postgres -c "psql -c \"ALTER USER $APPNAME WITH PASSWORD '$DBPASSWORD';\""
+echo "Creating PostgreSQL database '$APPNAME'..."
+su postgres -c "createdb --owner $APPNAME $APPNAME"
+
+
 # ###################################################################
 #  makemigrations & migrate  & createcachetable
 #  collectstatic
 # ###################################################################
 su -l $APPNAME << 'EOF'
+
 source ./bin/activate
 echo "initing database ..."
-ls ./.env
+
 ./manage.py collectstatic
 ./manage.py makemigrations
 ./manage.py migrate
@@ -219,16 +233,8 @@ mv /tmp/gunicorn_start.sh $APPFOLDERPATH
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/gunicorn_start.sh
 chmod u+x $APPFOLDERPATH/gunicorn_start.sh
 
-# ###################################################################
-# Create the PostgreSQL database and associated role for the app
-# Database and role name would be the same as the <appname> argument
-# ###################################################################
-echo "Creating PostgreSQL role '$APPNAME'..."
-su postgres -c "createuser -S -D -R -w $APPNAME"
-echo "Changing password of database role..."
-su postgres -c "psql -c \"ALTER USER $APPNAME WITH PASSWORD '$DBPASSWORD';\""
-echo "Creating PostgreSQL database '$APPNAME'..."
-su postgres -c "createdb --owner $APPNAME $APPNAME"
+
+
 
 # ###################################################################
 # Create nginx template in $APPFOLDERPATH/nginx
@@ -309,7 +315,8 @@ server {
 EOF
 # make a symbolic link to the nginx conf file in sites-enabled
 ln -sf $APPFOLDERPATH/nginx/$APPNAME.conf /etc/nginx/sites-enabled/$APPNAME
-
+# remove default site conf
+rm /etc/nginx/sites-enabled/default
 # ###################################################################
 # Setup supervisor
 # ###################################################################
