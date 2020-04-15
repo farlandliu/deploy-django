@@ -39,7 +39,7 @@ fi
 PYTHON_PREREQ=('virtualenv' 'supervisor')
 
 apt update
-pip3 install --upgrade pip
+sudo -H pip3 install --upgrade pip
 # Test prerequisites
 echo "Checking if required packages are installed..."
 declare -a MISSING

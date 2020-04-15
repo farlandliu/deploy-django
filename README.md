@@ -11,8 +11,29 @@ environment will have the following characterstics:
 * Supervisor, the python based daemon control process installed and
   configured with the necessary conf file to control the WSGI process.
 * An script to autostart supervisor and control it like other Ubuntu services.
+* **note:** rewrite scripts to fit the [puputblog](https://github.com/farlandliu/puputblog) deployment, 
+* **note:** The pupublog project uses this [django tempalte](https://github.com/jpadilla/django-project-template).
 
 # Usage
+
+**tested on ubuntu16.04 LTS**
+
+## folder structure
+
+```
+deploy-django
+│   ├── common_funcs.sh
+│   ├── create_django_project_run_env.sh
+│   ├── deploy_django_project.sh
+│   ├── install_os_prereq.sh
+│   ├── LICENSE
+│   ├── django_project_folder
+│   │   ├── config
+│   │   ├── ...
+│   ...
+
+```
+
 The primary end-user facing components of the package are the two scripts:-
 
 * `install_os_prereq.sh`
