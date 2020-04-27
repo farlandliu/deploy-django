@@ -239,6 +239,12 @@ chmod u+x $APPFOLDERPATH/gunicorn_start.sh
 # ###################################################################
 # Create nginx template in $APPFOLDERPATH/nginx
 # ###################################################################
+# create robots.txt
+cat > $APPFOLDERPATH/staticfiles/robots.txt << EOF
+User-agent: *
+Allow: /
+EOF
+
 mkdir -p $APPFOLDERPATH/nginx
 APPSERVERNAME=$APPNAME
 APPSERVERNAME+=_gunicorn
@@ -256,6 +262,10 @@ server {
 
     access_log $APPFOLDERPATH/logs/nginx-access.log;
     error_log $APPFOLDERPATH/logs/nginx-error.log;
+
+    location /robots.txt {
+        alias $APPFOLDERPATH/staticfiles/robots.txt;
+    } 
 
     location /media  {
         alias $APPFOLDERPATH/media;

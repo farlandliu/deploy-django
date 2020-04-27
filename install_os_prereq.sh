@@ -15,7 +15,8 @@ echo "  Python version is 2 or 3 and defaults to 3 if not specified. Subversion"
 echo "  of Python will be determined during runtime. The required Python version"
 echo "  has to be installed and available globally."
 echo
-exit 1
+echo "  will install python3 by default"
+# exit 1
 fi
 
 # Default python version to 3. OS has to have it installed.

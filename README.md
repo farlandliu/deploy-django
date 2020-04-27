@@ -14,11 +14,10 @@ environment will have the following characterstics:
 * **note:** rewrite scripts to fit the [puputblog](https://github.com/farlandliu/puputblog) deployment, 
 * **note:** The pupublog project uses this [django tempalte](https://github.com/jpadilla/django-project-template).
 
-# Usage
-
+# change log 
 **tested on ubuntu16.04 LTS**
 
-## folder structure
+## folder structure (2020-04-05)
 
 ```
 deploy-django
@@ -33,6 +32,17 @@ deploy-django
 │   ...
 
 ```
+## add robots.txt (2020-04-27)
+
+see deploy_django_project `nginx` section
+
+```
+location /robots.txt {
+        alias $APPFOLDERPATH/staticfiles/robots.txt;
+    } 
+```
+
+# Usage
 
 The primary end-user facing components of the package are the two scripts:-
 
