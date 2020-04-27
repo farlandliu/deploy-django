@@ -40,7 +40,7 @@ fi
 PYTHON_PREREQ=('virtualenv' 'supervisor')
 
 apt update
-sudo -H pip3 install --upgrade pip
+sudo -H $PIP install --upgrade pip
 # Test prerequisites
 echo "Checking if required packages are installed..."
 declare -a MISSING
@@ -57,7 +57,7 @@ for pkg in "${LINUX_PREREQ[@]}"
 for ppkg in "${PYTHON_PREREQ[@]}"
     do
         echo "Installing Python package '$ppkg'..."
-        $PIP install $ppkg
+        sudo -H $PIP install $ppkg
         if [ $? -ne 0 ]; then
             echo "Error installing python package '$ppkg'"
             exit 1

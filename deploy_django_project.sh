@@ -123,8 +123,10 @@ EOF
 
 # ###################################################################
 # Generate Django production secret key
+# < /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c16
 # ###################################################################
 echo "Generating Django secret key..."
+
 DJANGO_SECRET_KEY=`openssl rand -base64 48`
 if [ $? -ne 0 ]; then
     error_exit "Error creating secret key."
@@ -138,7 +140,7 @@ chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_secret_key
 # Generate DB password
 # ###################################################################
 echo "Creating secure password for database role..."
-DBPASSWORD=`openssl rand -base64 32`
+DBPASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c16`
 if [ $? -ne 0 ]; then
     error_exit "Error creating secure password for database role."
 fi

@@ -17,7 +17,8 @@ environment will have the following characterstics:
 # change log 
 **tested on ubuntu16.04 LTS**
 
-## folder structure (2020-04-05)
+## (2020-04-05)
+- folder structure 
 
 ```
 deploy-django
@@ -32,7 +33,12 @@ deploy-django
 │   ...
 
 ```
-## add robots.txt (2020-04-27)
+## (2020-04-27)
+- fix postgesql password script
+random password with special char like `CGvISFp6bOHvd6l/a105qI/` making database_url broken.
+using `< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c16` to generate db password
+
+- add robots.txt 
 
 see deploy_django_project `nginx` section
 
