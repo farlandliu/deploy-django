@@ -81,12 +81,12 @@ chmod g+x $APPFOLDERPATH || error_exit "Error setting group execute flag"
 # install python virtualenv in the APPFOLDER
 echo "Creating environment setup for django app..."
 
-#cd $APPFOLDERPATH
+
 if [ "$PYTHON_VERSION" == "3" ]; then
 su -l $APPNAME << 'EOF'
 cd ~
 echo "Setting up python virtualenv..."
-virtualenv -p python3 . || error_exit "Error installing Python 3 virtual environment to app folder"
+python3 -m venv .venv || error_exit "Error installing Python 3 virtual environment to app folder"
 
 EOF
 else
@@ -109,7 +109,7 @@ fi
 #		ssl	   -- SSL certificates for the domain(NA if LetsEncrypt is used)
 # ###################################################################
 su -l $APPNAME << 'EOF'
-source ./bin/activate
+source .venv/bin/activate
 # upgrade pip
 pip install --upgrade pip || error_exist "Error upgrading pip to the latest version"
 # install prerequisite python packages for a django app using pip
@@ -140,7 +140,7 @@ chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.django_secret_key
 # Generate DB password
 # ###################################################################
 echo "Creating secure password for database role..."
-DBPASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c16`
+DBPASSWORD=`< /dev/urandom tr -dc _A-Z-a-z-0-9 | head -c8`
 if [ $? -ne 0 ]; then
     error_exit "Error creating secure password for database role."
 fi
@@ -158,8 +158,8 @@ ENVIRONMENT='production'
 DJANGO_SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
 DJANGO_DEBUG='no'
 DJANGO_TEMPLATE_DEBUG='no'
-DJANGO_CACHE_URL=redis://127.0.0.1/1
-DJANGO_DATABASE_URL=postgres://$APPNAME:$DBPASSWORD@localhost:5432/$APPNAME
+CACHE_URL=redis://127.0.0.1/1
+DATABASE_URL=postgres://$APPNAME:$DBPASSWORD@localhost:5432/$APPNAME
 EOF
 mv /tmp/.env $APPFOLDERPATH/
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
@@ -182,7 +182,7 @@ su postgres -c "createdb --owner $APPNAME $APPNAME"
 # ###################################################################
 su -l $APPNAME << 'EOF'
 
-source ./bin/activate
+source .venv/bin/activate
 echo "initing database ..."
 
 ./manage.py collectstatic
@@ -222,12 +222,12 @@ echo "Starting $APPNAME as \`whoami\`"
 
 # Start your Django Unicorn
 # Programs meant to be run under supervisor should not daemonize themselves (do not use --daemon)
-exec ./bin/gunicorn \${DJANGO_WSGI_MODULE}:application \
+exec .venv/bin/gunicorn \${DJANGO_WSGI_MODULE}:application \
   --name $APPNAME \
   --workers \$NUM_WORKERS \
   --user=\$USER --group=\$GROUP \
   --bind=127.0.0.1:8000 \
-  --log-level=debug \
+  --log-level=info \
   --log-file=-
 EOF
 
@@ -235,8 +235,6 @@ EOF
 mv /tmp/gunicorn_start.sh $APPFOLDERPATH
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/gunicorn_start.sh
 chmod u+x $APPFOLDERPATH/gunicorn_start.sh
-
-
 
 
 # ###################################################################
@@ -342,6 +340,8 @@ if [ ! -f /etc/supervisord.conf ]; then
 fi
 
 # Create the supervisor application conf file
+touch /tmp/supervisor.sock
+chmod 755 /tmp/supervisor.sock
 mkdir -p /etc/supervisor
 cat > /etc/supervisor/$APPNAME.conf << EOF
 [program:$APPNAME]
