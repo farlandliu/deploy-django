@@ -92,7 +92,7 @@ EOF
 else
 su -l $APPNAME << 'EOF'
 echo "Setting up python virtualenv..."
-virtualenv . || error_exit "Error installing Python 2 virtual environment to app folder"
+virtualenv .venv || error_exit "Error installing Python 2 virtual environment to app folder"
 
 EOF
 fi
@@ -114,7 +114,7 @@ source ./bin/activate
 pip install --upgrade pip || error_exist "Error upgrading pip to the latest version"
 # install prerequisite python packages for a django app using pip
 echo "Installing base python packages for the app..."
-pip install -r requirements_dev.txt
+pip install -r requirements/base.txt
 # create the default folders where we store django app's resources
 echo "Creating static file folders..."
 mkdir logs nginx run static media staticfiles || error_exit "Error creating static folders"
@@ -158,7 +158,8 @@ ENVIRONMENT='production'
 DJANGO_SECRET_KEY=`cat $APPFOLDERPATH/.django_secret_key`
 DJANGO_DEBUG='no'
 DJANGO_TEMPLATE_DEBUG='no'
-DATABASE_URL=postgres://$APPNAME:$DBPASSWORD@localhost:5432/$APPNAME
+DJANGO_CACHE_URL=redis://127.0.0.1/1
+DJANGO_DATABASE_URL=postgres://$APPNAME:$DBPASSWORD@localhost:5432/$APPNAME
 EOF
 mv /tmp/.env $APPFOLDERPATH/
 chown $APPNAME:$GROUPNAME $APPFOLDERPATH/.env
@@ -328,7 +329,7 @@ EOF
 # make a symbolic link to the nginx conf file in sites-enabled
 ln -sf $APPFOLDERPATH/nginx/$APPNAME.conf /etc/nginx/sites-enabled/$APPNAME
 # remove default site conf
-rm /etc/nginx/sites-enabled/default
+#rm /etc/nginx/sites-enabled/default
 # ###################################################################
 # Setup supervisor
 # ###################################################################
