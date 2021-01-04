@@ -32,7 +32,7 @@ fi
 # script will attempt to install it. If installation fails, it will abort.
 if [ "$PYTHON_VERSION" == "3" ]; then
 PIP="pip3"
-LINUX_PREREQ=('git' 'build-essential' 'python3-dev' 'python3-pip' 'nginx' 'postgresql' 'libpq-dev' )
+LINUX_PREREQ=('git' 'build-essential' 'python3-dev' 'python3-pip' 'nginx' 'postgresql' 'libpq-dev' 'redis-server' )
 else
 PIP="pip"
 LINUX_PREREQ=('git' 'build-essential' 'python-dev' 'python-pip' 'nginx' 'postgresql' 'libpq-dev')
