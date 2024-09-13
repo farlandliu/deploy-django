@@ -86,7 +86,7 @@ if [ "$PYTHON_VERSION" == "3" ]; then
 su -l $APPNAME << 'EOF'
 cd ~
 echo "Setting up python virtualenv..."
-python3 -m venv .venv || error_exit "Error installing Python 3 virtual environment to app folder"
+python3 -m venv .venv --upgrade-deps || error_exit "Error installing Python 3 virtual environment to app folder"
 
 EOF
 else
@@ -111,6 +111,7 @@ fi
 su -l $APPNAME << 'EOF'
 source .venv/bin/activate
 # upgrade pip
+python3 -m upgrade_ensurepip
 pip install --upgrade pip || error_exist "Error upgrading pip to the latest version"
 # install prerequisite python packages for a django app using pip
 echo "Installing base python packages for the app..."
