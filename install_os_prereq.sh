@@ -32,12 +32,12 @@ fi
 # script will attempt to install it. If installation fails, it will abort.
 if [ "$PYTHON_VERSION" == "3" ]; then
 PIP="pip3"
-LINUX_PREREQ=('git' 'build-essential' 'python3-dev' 'python3-pip' 'nginx' 'postgresql' 'libpq-dev' 'redis-server' )
+LINUX_PREREQ=('git' 'build-essential' 'python3-venv' 'python3-dev' 'python3-pip' 'nginx' 'postgresql' 'libpq-dev' 'redis-server' 'supervisor' 'libjpeg-dev' )
 else
 PIP="pip"
 LINUX_PREREQ=('git' 'build-essential' 'python-dev' 'python-pip' 'nginx' 'postgresql' 'libpq-dev')
 fi
-PYTHON_PREREQ=('virtualenv' 'supervisor')
+PYTHON_PREREQ=('virtualenv')
 
 apt update
 sudo -H $PIP install --upgrade pip
